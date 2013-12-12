@@ -81,30 +81,38 @@
 	LocStore.prototype.setProp = function(props,val,merge){
 		var len = props.length
 		var cur = this
+		var emits = []
 		props.splice(0,0,'data')
 		for (var i=0; i<len; ++i) {
 			var prop = String(props[i])
-			if (typeof(cur[prop])!='object' || cur[prop]==null) {
+			if (!isObject(cur[prop])) {
+				var preval = cur[prop]
 				cur[prop] = {}
+				emits.push([props.slice(0,+i+1).join('::'), cur[prop], preval])
 			}
 			cur = cur[prop]
 		}
 		if (cur[props[len]] === val) return
 		var preval = cur[props[len]]
 		if (merge) {
-			if (typeof(cur[props[len]])!='object' || cur[props[len]]==null) cur[props[len]]={}
+			emit()
+			if (!isObject(preval)) {
+				cur[props[len]]={}
+				emits.push([props.join('::'), cur[props[len]], preval])
+			}
 			this.mergeRecursive(cur[props[len]], val, props)  // merge
 		} else {
 			cur[props[len]] = val // set
-			this.emit(props.join('::'), val, preval)
+			emits.push([props.join('::'), val, preval])
 			if (isObject(preval)) this.mergeRecursive(preval, val, props, true)
 		}
-		
+
+		for (var i in emits) this.emit.apply(this, emits[i])
 	}
 
 	LocStore.prototype.emit = function(hash,val,preval){
 		var self = this
-		//console.log('####',arguments)
+		console.log('####', JSON.stringify(arguments,null,2))
 		var handlers = self.handlers[hash]
 		handlers && handlers.forEach(function(handler){
 			handler.call(self,val,preval)
@@ -132,7 +140,7 @@
 
 	LocStore.prototype.mergeRecursive = function (obj1, obj2, props, clean) {
 		if (clean) this.cleanRecursive(obj1, obj2, props)
-		for (var p in obj2) {
+		if (isObject(obj2)) for (var p in obj2) {
 			var props_inc = props&&props.concat([p])
 			if (isObject(obj2[p]) && isObject(obj1[p])) {
 				obj1[p] = this.mergeRecursive(obj1[p], obj2[p], props_inc, clean)
@@ -147,7 +155,7 @@
 	}
 
 	LocStore.prototype.cleanRecursive = function (obj1, obj2, props) {
-		var keys = Object.keys(obj2)
+		var keys = isObject(obj2) ? Object.keys(obj2) : []
 		for (var p in obj1) {
 			if (keys.indexOf(p)==-1) {
 				var props_inc = props&&props.concat([p])
@@ -172,7 +180,6 @@
 	LocStore.get = function(){
 
 		if (arguments.length==0) return
-		if (isObject(arguments[0]) && arguments.length<2) return
 
 		var store = LocStore(arguments[0])
 		
@@ -182,7 +189,7 @@
 	LocStore.set = function(){
 
 		if (arguments.length<2) return
-		if (isObject(arguments[0]) && arguments.length<3) return
+		if (isObject(arguments[0]) && arguments.length<2) return
 
 		var store = LocStore(arguments[0])
 		store.set.apply(store, [].slice.call(arguments,1))
