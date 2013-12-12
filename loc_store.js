@@ -42,6 +42,7 @@
 			return this.getProp(arguments)
 		}
 	}
+
 	LocStore.prototype.getProp = function(props){
 		var cur = this;
 		[].splice.call(props,0,0,'data')
@@ -58,7 +59,7 @@
 	}
 
 	LocStore.prototype.set = function(){
-		return this.parseArgs(arguments)	
+		return this.parseArgs(arguments)
 	}
 
 	LocStore.prototype.merge = function(){
@@ -66,9 +67,9 @@
 	}
 
 	LocStore.prototype.parseArgs = function(args,merge){
-		if (!args.length) {
-			return
-		} else if (typeof(args[0])=='object' && args[1]) {
+		if (args.length==0) return
+		
+		if ((args[0] instanceof Array) && args.length==2) {
 			this.setProp(args[0],args[1],merge)
 		} else {
 			var props = [].slice.call(args,0,-1)
@@ -92,58 +93,70 @@
 		var preval = cur[props[len]]
 		if (merge) {
 			if (typeof(cur[props[len]])!='object' || cur[props[len]]==null) cur[props[len]]={}
-			this.mergeRecursive(cur[props[len]],val,props.slice(1))  // merge
+			this.mergeRecursive(cur[props[len]], val, props)  // merge
 		} else {
 			cur[props[len]] = val // set
-			if (this instanceof LocStore) this.emit(props.slice(1).join('::'),val,preval)
+			this.emit(props.join('::'), val, preval)
+			if (isObject(preval)) this.mergeRecursive(preval, val, props, true)
 		}
 		
 	}
 
-	LocStore.prototype.emit = function(props,val,preval){
+	LocStore.prototype.emit = function(hash,val,preval){
 		var self = this
-		var handlers = self.handlers[props]
+		//console.log('####',arguments)
+		var handlers = self.handlers[hash]
 		handlers && handlers.forEach(function(handler){
 			handler.call(self,val,preval)
 		})
+		return this
 	}
 
 	LocStore.prototype.bind = function(hash,handler){
-		if (!handler) return this
-		this.handlers[hash] = this.handlers[hash]||[]
-		this.handlers[hash].push(handler)
+		if (typeof(handler)=='function') {
+			this.handlers[hash] = this.handlers[hash]||[]
+			this.handlers[hash].push(handler)
+		}
 		return this
 	}
 
 	LocStore.prototype.unbind = function(hash,handler){
-		if (handler) {
+		if (typeof(handler)=='function') {
 			var pos = this.handlers[hash].indexOf(handler)
-			if (pos!=-1) {
-				this.handlers[hash].splice(pos,1)
-				return handler
-			} else return false
-		} else {
-			var deleted = this.handlers[hash]
+			if (pos!=-1) this.handlers[hash].splice(pos,1)
+		} else if (!handler) {
 			this.handlers[hash] = []
-			return deleted
 		}
+		return this
 	}
 
-	LocStore.prototype.mergeRecursive = function (obj1, obj2, props) {
+	LocStore.prototype.mergeRecursive = function (obj1, obj2, props, clean) {
+		if (clean) this.cleanRecursive(obj1, obj2, props)
 		for (var p in obj2) {
-			var props_p = props.concat([p])
-			if (
-				(typeof(obj2[p])=='object' && obj2[p]!=null) &&
-				(typeof(obj1[p])=='object' && obj1[p]!=null)
-			) {
-				obj1[p] = this.mergeRecursive(obj1[p], obj2[p], props_p)
+			var props_inc = props&&props.concat([p])
+			if (isObject(obj2[p]) && isObject(obj1[p])) {
+				obj1[p] = this.mergeRecursive(obj1[p], obj2[p], props_inc, clean)
 			} else {
 				var preval = obj1[p]
-				obj1[p] = obj2[p]
-				this.emit(props_p.join('::'),obj2[p],preval)
+				if (!clean) obj1[p] = obj2[p]
+				if (props_inc) this.emit(props_inc.join('::'), obj2[p], preval)
+				if (isObject(preval)) this.cleanRecursive(preval, {}, props_inc)
 			}
 		}
 		return obj1
+	}
+
+	LocStore.prototype.cleanRecursive = function (obj1, obj2, props) {
+		var keys = Object.keys(obj2)
+		for (var p in obj1) {
+			if (keys.indexOf(p)==-1) {
+				var props_inc = props&&props.concat([p])
+				//delete obj1[p]
+				var preval = obj1[p]
+				if (isObject(preval)) this.cleanRecursive(preval, {}, props_inc)
+				if (props_inc) this.emit(props_inc.join('::'), undefined, preval)
+			}
+		}
 	}
 
 	LocStore.prototype.save = function(){
@@ -152,47 +165,42 @@
 		return this.data
 	}
 
+	var isObject = function(obj){
+		return (typeof(obj)=='object' && obj!=null)
+	}
+
 	LocStore.get = function(){
-		var store = {
-			name: arguments[0]
-		}
-		if (store.name) {
-			if (typeof(store.name)=='string') {
-				store.data = Source.get(store.name)
-			} else {
-				store.data = store.name
-			}
-			return this.prototype.getProp.bind(store)([].slice.call(arguments,1))
-		} else return
+
+		if (arguments.length==0) return
+		if (isObject(arguments[0]) && arguments.length<2) return
+
+		var store = LocStore(arguments[0])
+		
+		return store.get.apply(store, [].slice.call(arguments,1))
 	}
 
 	LocStore.set = function(){
-		var store = {
-			name: arguments[0]
-		}
-		if (store.name) {
-			if (typeof(store.name)=='string') {
-				store.data = Source.get(store.name)
-			} else {
-				store.data = store.name
-				delete store.name
-			}
-			this.prototype.setProp.bind(store)([].slice.call(arguments,1,-1),arguments[arguments.length-1])
-			this.prototype.save.bind(store)()
-			return store.data
-		} else return
-	}
 
-	var NODE_ENV = false
+		if (arguments.length<2) return
+		if (isObject(arguments[0]) && arguments.length<3) return
+
+		var store = LocStore(arguments[0])
+		store.set.apply(store, [].slice.call(arguments,1))
+		store.save()
+
+		return store.data
+	}
 
 	var Source = {
 		get: function(target){
 			try{
-				return NODE_ENV
-					   ? JSON.parse(require('fs').readFileSync(target))
-					   : JSON.parse(localStorage.getItem(target))
+				if (NODE_ENV) return JSON.parse(require('fs').readFileSync(target))
+				else {
+					var val = localStorage.getItem(target)
+					return (val=='undefined') ? undefined : JSON.parse(val)
+				}
 			} catch(err){
-				console.log(err)
+				console.error('get data error:',err)
 				return {}
 			}
 		},
@@ -203,6 +211,8 @@
 		},
 	}
 
+	var NODE_ENV
+
 	//Export the LocStore object for Node.js
 	if (typeof exports !== 'undefined') {
 		NODE_ENV = true
@@ -211,6 +221,7 @@
 		}
 		exports.LocStore = LocStore
 	} else { //for Browser
+		NODE_ENV = false
 		window.LocStore = LocStore
 	}
 
