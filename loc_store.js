@@ -49,9 +49,9 @@
 		var len = props.length
 		for (var i=0; i<len; ++i) {
 			var prop = String(props[i])
-			if (typeof(cur[prop])!='object' || cur[prop]==null) {
+			if (!isObject(cur[prop]) && typeof(cur[prop])!='string') {
 				if (i == len-1) return cur[prop]
-				else return;
+				else return
 			}
 			cur = cur[prop]
 		}
@@ -94,17 +94,31 @@
 		}
 		if (cur[props[len]] === val) return
 		var preval = cur[props[len]]
+
 		if (merge) {
-			emit()
-			if (!isObject(preval)) {
-				cur[props[len]]={}
-				emits.push([props.join('::'), cur[props[len]], preval])
-			}
-			this.mergeRecursive(cur[props[len]], val, props)  // merge
+			if (!isObject(preval)) cur[props[len]]={}
+			this.mergeRecursive(cur[props[len]], val, {
+				props: props,
+				emits: emits
+			})  // merge
+			if (!isObject(preval)) emits.push([props.join('::'), cur[props[len]], preval])
 		} else {
 			cur[props[len]] = val // set
+			
+			if (isObject(preval)) {
+				this.mergeRecursive(preval, val, {
+					props: props,
+					emits: emits,
+					clean: true
+				})
+			} else if (isObject(val)) {
+				this.mergeRecursive({}, val, {
+					props: props,
+					emits: emits,
+					clean: true
+				})
+			}
 			emits.push([props.join('::'), val, preval])
-			if (isObject(preval)) this.mergeRecursive(preval, val, props, true)
 		}
 
 		for (var i in emits) this.emit.apply(this, emits[i])
@@ -138,31 +152,54 @@
 		return this
 	}
 
-	LocStore.prototype.mergeRecursive = function (obj1, obj2, props, clean) {
-		if (clean) this.cleanRecursive(obj1, obj2, props)
+	LocStore.prototype.mergeRecursive = function (obj1, obj2, options) {
+		if (options.clean) this.cleanRecursive(obj1, obj2, {
+			props: options.props,
+			emits: options.emits
+		})
 		if (isObject(obj2)) for (var p in obj2) {
-			var props_inc = props&&props.concat([p])
+			var props_inc = options.props&&options.props.concat([p])
 			if (isObject(obj2[p]) && isObject(obj1[p])) {
-				obj1[p] = this.mergeRecursive(obj1[p], obj2[p], props_inc, clean)
+				obj1[p] = this.mergeRecursive(obj1[p], obj2[p], {
+					props: props_inc,
+					emits: options.emits,
+					clean: options.clean 
+				})
 			} else {
 				var preval = obj1[p]
-				if (!clean) obj1[p] = obj2[p]
-				if (props_inc) this.emit(props_inc.join('::'), obj2[p], preval)
-				if (isObject(preval)) this.cleanRecursive(preval, {}, props_inc)
+				if (!options.clean) obj1[p] = obj2[p]
+								
+				if (isObject(preval)) this.cleanRecursive(preval, {}, { 
+					props: props_inc,
+					emits: options.emits
+				})
+				if (isObject(obj2[p])) {
+					this.mergeRecursive({}, obj2[p], { 
+						props: props_inc,
+						emits: options.emits,
+						clean: true
+					})
+				}
+
+				if (props_inc) options.emits.push([props_inc.join('::'), obj2[p], preval]) //this.emit(props_inc.join('::'), obj2[p], preval)
+
 			}
 		}
 		return obj1
 	}
 
-	LocStore.prototype.cleanRecursive = function (obj1, obj2, props) {
+	LocStore.prototype.cleanRecursive = function (obj1, obj2, options) {
 		var keys = isObject(obj2) ? Object.keys(obj2) : []
 		for (var p in obj1) {
 			if (keys.indexOf(p)==-1) {
-				var props_inc = props&&props.concat([p])
+				var props_inc = options.props&&options.props.concat([p])
 				//delete obj1[p]
 				var preval = obj1[p]
-				if (isObject(preval)) this.cleanRecursive(preval, {}, props_inc)
-				if (props_inc) this.emit(props_inc.join('::'), undefined, preval)
+				if (isObject(preval)) this.cleanRecursive(preval, {}, {
+					props: props_inc,
+					emits: options.emits
+				})
+				if (props_inc) options.emits.push([props_inc.join('::'), undefined, preval]) //this.emit(props_inc.join('::'), undefined, preval)
 			}
 		}
 	}
