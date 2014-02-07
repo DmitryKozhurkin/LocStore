@@ -70,22 +70,22 @@ describe("LocStore", function() {
 
     it('set property', function() {
       mystore.set('obj','c','C-value')
-      expect(mystore.get('obj','c')).toBe('C-value')
+      expect(mystore.getLast()).toBe('C-value')
 
       mystore.set('obj','d','deep','deep value')
       expect(mystore.get('obj','d')).toEqual({ deep: 'deep value' })
 
       mystore.set('obj','c','deep',undefined)
-      expect(mystore.get('obj','c','deep')).toBe(undefined)
+      expect(mystore.getLast()).toBe(undefined)
 
       mystore.set('obj','c','deep',null)
-      expect(mystore.get('obj','c','deep')).toBe(null)
+      expect(mystore.getLast()).toBe(null)
 
       mystore.set('a','b','c',undefined)
       expect(mystore.get('a')).toEqual({ b: { c: undefined } })
 
       mystore.set('a',undefined)
-      expect(mystore.get('a')).toBe(undefined)
+      expect(mystore.getLast()).toBe(undefined)
     })
 
     

@@ -27,10 +27,19 @@
 		} else if (typeof(target)=='string') { // если передать строку то данные будут извлечены из localStorage или из файла в зависимости от окружения
 			this.name = target
 			this.data = Source.get(target)
+			this.filters = []
 		} else {
 			this.data = {}
 		}
 		this.handlers = []
+	}
+
+	LocStore.prototype.addFilter = function(func){
+		this.filters.push(func)
+	}
+
+	LocStore.prototype.clearFilters = function(func){
+		this.filters = []
 	}
 
 	LocStore.prototype.get = function(){
@@ -41,6 +50,10 @@
 		} else {
 			return this.getProp(arguments)
 		}
+	}
+
+	LocStore.prototype.getLast = function(){
+		return this.returned
 	}
 
 	LocStore.prototype.getProp = function(props){
@@ -75,7 +88,7 @@
 			var props = [].slice.call(args,0,-1)
 			this.setProp(props,args[args.length-1],merge)
 		}
-		return this.data
+		return this
 	}
 
 	LocStore.prototype.setProp = function(props,val,merge){
@@ -92,7 +105,10 @@
 			}
 			cur = cur[prop]
 		}
-		if (cur[props[len]] === val) return
+		if (cur[props[len]] === val) {
+			this.returned = val
+			return
+		}
 		var preval = cur[props[len]]
 
 		if (merge) {
@@ -102,6 +118,7 @@
 				emits: emits
 			})  // merge
 			if (!isObject(preval)) emits.push([props.join('::'), cur[props[len]], preval])
+			this.returned = cur[props[len]]
 		} else {
 			cur[props[len]] = val // set
 			
@@ -119,6 +136,7 @@
 				})
 			}
 			emits.push([props.join('::'), val, preval])
+			this.returned = val
 		}
 
 		for (var i in emits) this.emit.apply(this, emits[i])
@@ -205,9 +223,21 @@
 	}
 
 	LocStore.prototype.save = function(){
-		if (this.name)
-			Source.set(this.name,this.data)
-		return this.data
+		if (arguments.length) this.set.apply(this,arguments)
+		var self = this;
+		if (self.name) {
+			var i = 0;
+			var next = function(data){
+				self.data = data||self.data;
+				var filter = (self.filters||[])[i++];
+				if (filter) {
+					filter(self.data,next)
+				} else {
+					Source.set(self.name,self.data)
+				} 
+			}
+			next(self.data)
+		}
 	}
 
 	var isObject = function(obj){
@@ -232,8 +262,10 @@
 		store.set.apply(store, [].slice.call(arguments,1))
 		store.save()
 
-		return store.data
+		return store
 	}
+
+	//LocStore.merge
 
 	var Source = {
 		get: function(target){
@@ -255,7 +287,7 @@
 		},
 	}
 
-	var NODE_ENV
+	var NODE_ENV;
 
 	//Export the LocStore object for Node.js
 	if (typeof exports !== 'undefined') {
