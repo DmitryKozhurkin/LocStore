@@ -149,6 +149,10 @@
 		handlers && handlers.forEach(function(handler){
 			handler.call(self,val,preval)
 		})
+		var all = self.handlers['all']
+		all && all.forEach(function(handler){
+			handler.call(self,hash,val,preval)
+		})
 		return this
 	}
 
@@ -199,7 +203,8 @@
 					})
 				}
 
-				if (props_inc) options.emits.push([props_inc.join('::'), obj2[p], preval]) //this.emit(props_inc.join('::'), obj2[p], preval)
+				if (props_inc && (obj2[p]!=preval))
+					options.emits.push([props_inc.join('::'), obj2[p], preval]) //this.emit(props_inc.join('::'), obj2[p], preval)
 
 			}
 		}

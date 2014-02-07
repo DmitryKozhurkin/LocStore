@@ -104,6 +104,28 @@ describe("LocStore", function() {
 
     })
 
+    it('events property', function() {
+      init()
+
+      var fired = []
+      mystore.bind('all', function(hash, val, preval){ fired.push(hash) })
+      mystore.merge('all', { ALL: ['a','l','l',], ololo: { a: 123 } })
+      expect(fired).toEqual([
+        'data::all::ALL::0',
+        'data::all::ALL::1',
+        'data::all::ALL::2',
+        'data::all::ALL',
+        'data::all::ololo::a',
+        'data::all::ololo',
+        'data::all'
+      ])
+      var fired = []
+      mystore.merge('all', { ALL: ['a','l','l',], ololo: { a: 123 } })
+      expect(fired).toEqual([])
+      console.log('##########', fired)
+
+    })
+
   })
 
 })
