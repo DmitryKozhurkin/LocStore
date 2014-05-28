@@ -4,6 +4,7 @@
  * функции обработки данных перед сохранением
 
 Пример:
+```
 	var obj = {
 		settings: {
 			host: '196.168.56.1'
@@ -12,7 +13,10 @@
 	LocStore.get(obj,'settings','host'); // вернет '196.168.56.1'
 	LocStore.get(obj,'settings','port'); // вернет undefined
 
+```
 Пример:
+```
 	var obj = {};
 	LocStore.set(obj,'a','b','c','Hello!');
 	console.log(obj) // {"a":{"b":{"c":"Hello!"}}}
+```
