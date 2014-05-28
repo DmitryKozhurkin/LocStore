@@ -203,7 +203,7 @@
 					})
 				}
 
-				if (props_inc && (obj2[p]!=preval))
+				if (props_inc && (obj2[p]!==preval))
 					options.emits.push([props_inc.join('::'), obj2[p], preval]) //this.emit(props_inc.join('::'), obj2[p], preval)
 
 			}

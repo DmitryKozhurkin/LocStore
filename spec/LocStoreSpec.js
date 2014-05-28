@@ -119,10 +119,28 @@ describe("LocStore", function() {
         'data::all::ololo',
         'data::all'
       ])
+
       var fired = []
       mystore.merge('all', { ALL: ['a','l','l',], ololo: { a: 123 } })
       expect(fired).toEqual([])
-      console.log('##########', fired)
+
+      var fired = []
+      mystore.merge('empty', undefined)
+      expect(fired).toEqual([])
+
+      var fired = []
+      mystore.merge('empty', { a: undefined })
+      expect(fired).toEqual(['data::empty'])
+
+      var fired = []
+      mystore.merge('testnull', null)
+      expect(fired).toEqual(['data::testnull'])
+
+      var fired = []
+      mystore.merge('testobjnull', { val: null })
+      expect(fired).toEqual(['data::testobjnull::val','data::testobjnull'])
+
+
 
     })
 
